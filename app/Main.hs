@@ -33,6 +33,9 @@ bg = unsafePerformIO $ loadBMP "assets/volcanoBGbigger.bmp"
 bg2 :: Picture
 bg2 = unsafePerformIO $ loadBMP "assets/volcanoBGbigger.bmp"
 
+player :: Picture
+player = unsafePerformIO $ loadBMP "assets/orangeship3.bmp"
+
 
 bgScrollSpeed :: Float
 bgScrollSpeed = 450
@@ -72,6 +75,8 @@ initialState = Game
     backgroundY = 0,
     background2Y = bgHeight
   }
+  
+
 
 render :: VideoGame -> Picture
 render game = 
@@ -85,7 +90,6 @@ render game =
                bgy = backgroundY game
                bg2y = background2Y game
                (x,y) = playerLoc game
-               player = color red $ rectangleSolid playerWidth playerHeight
 
                leftX = x - 50
                rightX = x + 50
@@ -97,8 +101,6 @@ render game =
 
 background :: Color
 background = white
-
-
 
 fps :: Int
 fps = 60
