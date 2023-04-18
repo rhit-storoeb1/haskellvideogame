@@ -14,6 +14,10 @@ playerWidth = 50
 playerHeight = 75
 playerSpeed = 5
 
+meleeWidth, meleeHeight :: Float
+meleeWidth = 60
+meleeHeight = 10
+
 window :: Display
 window = InWindow "Game" (width, height) (offset, offset)
 
@@ -22,7 +26,8 @@ data VideoGame = Game
     playerMovingUp :: Bool,
     playerMovingRight :: Bool,
     playerMovingDown :: Bool,
-    playerMovingLeft :: Bool
+    playerMovingLeft :: Bool,
+    meleeActive :: Bool
   } deriving Show 
   
 initialState :: VideoGame
@@ -31,15 +36,26 @@ initialState = Game
     playerMovingUp = False,
     playerMovingRight = False,
     playerMovingDown = False,
-    playerMovingLeft = False
+    playerMovingLeft = False,
+    meleeActive = False
   }
 
 render :: VideoGame -> Picture
 render game = 
-              pictures [translate x y player]
+              pictures [translate x y player, 
+                        mkMelee leftX y,
+                        mkMelee rightX y
+                        ]
                where
                (x,y) = playerLoc game
                player = color red $ rectangleSolid playerWidth playerHeight
+
+               leftX = x - 50
+               rightX = x + 50
+               meleeColor = if (meleeActive game) then blue else makeColor 0 0 0 0
+
+               mkMelee :: Float -> Float -> Picture
+               mkMelee x y = pictures [translate x y $ color meleeColor $ rectangleSolid meleeWidth meleeHeight]
   
 
 background :: Color
@@ -61,6 +77,9 @@ handleKeys (EventKey (Char 's') Up _ _) game = game {playerMovingDown = False}
 
 handleKeys (EventKey (Char 'd') Down _ _) game = game {playerMovingRight = True}
 handleKeys (EventKey (Char 'd') Up _ _) game = game {playerMovingRight = False}
+
+handleKeys (EventKey (Char 'k') Down _ _) game = game {meleeActive = True}
+handleKeys (EventKey (Char 'k') Up _ _) game = game {meleeActive = False}
 
 handleKeys _ game = game
 
@@ -94,7 +113,8 @@ movePlayer game = game {playerLoc = (x', y')}
                     x' = x + moveX'
                     y' = y + moveY'               
                     
-                  
+-- showMelee :: VideoGame -> VideoGame
+-- bullets: take the picture passed in from render and do pictures [(pictures picture) ADD HERE]
 
 
 
