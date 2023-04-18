@@ -77,13 +77,19 @@ movePlayer game = game {playerLoc = (x', y')}
                             then -playerSpeed
                             else 0
                     moveX' = if right
-                             then moveX + playerSpeed
+                             then 
+                              if x >= ((fromIntegral width/2) - (playerWidth/2)) then 0
+                              else moveX + playerSpeed
+                             else if x <= ((-fromIntegral width/2) + (playerWidth/2)) then 0
                              else moveX
                     moveY = if up
                             then playerSpeed
                             else 0
                     moveY' = if down
-                             then moveY - playerSpeed
+                             then 
+                              if y <= ((-fromIntegral height/2) + (playerHeight/2)) then 0
+                              else moveY - playerSpeed
+                             else if y >= ((fromIntegral height/2) - (playerHeight/2)) then 0 
                              else moveY
                     x' = x + moveX'
                     y' = y + moveY'               
