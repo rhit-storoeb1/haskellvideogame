@@ -3,10 +3,11 @@ module Main(main) where
 import Graphics.Gloss
 import Graphics.Gloss.Data.ViewPort
 import Graphics.Gloss.Interface.Pure.Game
+import System.IO.Unsafe
 
 width, height, offset :: Int
-width = 750
-height = 600
+width = 620
+height = 950
 offset = 100
 
 playerWidth, playerHeight, playerSpeed :: Float
@@ -20,6 +21,9 @@ meleeHeight = 10
 
 window :: Display
 window = InWindow "Game" (width, height) (offset, offset)
+
+bg :: Picture
+bg = unsafePerformIO $ loadBMP "assets/volcanoBGbigger.bmp"
 
 data VideoGame = Game
   { playerLoc :: (Float, Float) ,
@@ -42,11 +46,13 @@ initialState = Game
 
 render :: VideoGame -> Picture
 render game = 
-              pictures [translate x y player, 
+              pictures [translate bgx bgy bg, 
+                        translate x y player, 
                         mkMelee leftX y,
                         mkMelee rightX y
                         ]
                where
+               (bgx, bgy) = (0, 0)
                (x,y) = playerLoc game
                player = color red $ rectangleSolid playerWidth playerHeight
 
@@ -60,6 +66,8 @@ render game =
 
 background :: Color
 background = white
+
+
 
 fps :: Int
 fps = 60
