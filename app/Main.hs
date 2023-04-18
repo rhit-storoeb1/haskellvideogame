@@ -19,6 +19,9 @@ meleeWidth, meleeHeight :: Float
 meleeWidth = 60
 meleeHeight = 10
 
+smallBulletDims :: Float
+smallBulletDims = 10
+
 bgHeight, bgWidth :: Float
 bgHeight = 2572
 bgWidth = 619
@@ -61,7 +64,10 @@ data VideoGame = Game
     playerMovingLeft :: Bool,
     meleeActive :: Bool,
     backgroundY :: Float,
-    background2Y :: Float
+    background2Y :: Float,
+    shootTimer :: Int,
+    bullets :: [Bullet],
+    shootMachineGun :: Bool
   } deriving Show 
   
 initialState :: VideoGame
@@ -73,7 +79,10 @@ initialState = Game
     playerMovingLeft = False,
     meleeActive = False,
     backgroundY = 0,
-    background2Y = bgHeight
+    background2Y = bgHeight,
+    shootTimer = 0,
+    bullets = [],
+    shootMachineGun = False
   }
   
 
@@ -84,7 +93,8 @@ render game =
                         translate 0 bg2y bg2,
                         translate x y player, 
                         mkMelee leftX y,
-                        mkMelee rightX y
+                        mkMelee rightX y,
+                        mkBullet (bullets game)
                         ]
                where
                bgy = backgroundY game
@@ -96,11 +106,77 @@ render game =
                meleeColor = if (meleeActive game) then blue else makeColor 0 0 0 0
 
                mkMelee :: Float -> Float -> Picture
-               mkMelee x y = pictures [translate x y $ color meleeColor $ rectangleSolid meleeWidth meleeHeight]
-  
+               mkMelee x y = pictures [translate x y $ color meleeColor $ rectangleSolid meleeWidth meleeHeight]  
+
+mkBullet :: [Bullet] -> Picture
+mkBullet [] = pictures []
+mkBullet (bullet:rest) = 
+  pictures [drawnBullet, restOfBullets]
+  where
+    drawnBullet = translate (x bullet) (y bullet) $ color black $ rectangleSolid smallBulletDims smallBulletDims
+    restOfBullets = mkBullet rest
 
 background :: Color
 background = white
+
+data Bullet = Bullet 
+  { x :: Float,
+    y :: Float,
+    xv :: Float,
+    yv :: Float,
+    damage :: Int
+  } deriving Show
+
+append :: Bullet -> [Bullet] -> [Bullet]
+append b [] = [b]
+append b (x:xs) = x : append b xs
+
+addBullet :: VideoGame -> VideoGame
+addBullet game = game { bullets = newBulletsList }
+  where 
+    time = shootTimer game
+    (bx,by) = playerLoc game
+    oldBullets = bullets game
+    newBullet = Bullet {
+        x = bx,
+        y = by,
+        xv = 0,
+        yv = 30,
+        damage = 50
+      }
+    newBulletsList = 
+      if (time `mod` 10 == 1) 
+        then append newBullet oldBullets
+        else oldBullets
+
+updateBullets :: VideoGame -> VideoGame
+updateBullets game = game { bullets = newBullets }
+  where
+    newBullets = moveBullets (bullets game)
+
+moveBullets :: [Bullet] -> [Bullet]
+moveBullets [] = []
+moveBullets (bullet:rest) = newBulletsList
+  where
+  -- add top wall collision detection here (I believe)
+  newBullet = Bullet {
+    x = (x bullet),
+    y = (y bullet) + (yv bullet),
+    xv = (xv bullet),
+    yv = (yv bullet),
+    damage = (damage bullet)
+  }
+  restOfBullets = moveBullets rest
+  newBulletsList = append newBullet restOfBullets
+
+
+updateTimer :: VideoGame -> VideoGame
+updateTimer game = game { shootTimer = newShootTimerVal }
+  where
+    newShootTimerVal = 
+      if (shootMachineGun game)
+        then (shootTimer game) + 1
+        else 0
 
 fps :: Int
 fps = 60
@@ -121,6 +197,9 @@ handleKeys (EventKey (Char 'd') Up _ _) game = game {playerMovingRight = False}
 
 handleKeys (EventKey (Char 'k') Down _ _) game = game {meleeActive = True}
 handleKeys (EventKey (Char 'k') Up _ _) game = game {meleeActive = False}
+
+handleKeys (EventKey (Char 'h') Down _ _) game = game {shootMachineGun = True}
+handleKeys (EventKey (Char 'h') Up _ _) game = game {shootMachineGun = False}
 
 handleKeys _ game = game
 
@@ -163,4 +242,4 @@ main :: IO ()
 main = play window background fps initialState render handleKeys update
  where
   update :: Float -> VideoGame -> VideoGame
-  update seconds = movePlayer . moveBG seconds
+  update seconds = updateBullets . addBullet . updateTimer . movePlayer . moveBG seconds
