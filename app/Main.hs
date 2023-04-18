@@ -6,7 +6,7 @@ import Graphics.Gloss.Interface.Pure.Game
 import System.IO.Unsafe
 
 width, height, offset :: Int
-width = 620
+width = round bgWidth - 5
 height = 950
 offset = 100
 
@@ -19,11 +19,36 @@ meleeWidth, meleeHeight :: Float
 meleeWidth = 60
 meleeHeight = 10
 
+bgHeight, bgWidth :: Float
+bgHeight = 2572
+bgWidth = 619
+
+
 window :: Display
 window = InWindow "Game" (width, height) (offset, offset)
 
 bg :: Picture
 bg = unsafePerformIO $ loadBMP "assets/volcanoBGbigger.bmp"
+
+bg2 :: Picture
+bg2 = unsafePerformIO $ loadBMP "assets/volcanoBGbigger.bmp"
+
+
+bgScrollSpeed :: Float
+bgScrollSpeed = 450
+
+moveBG seconds game = game {backgroundY = y',
+                            background2Y = y''}
+                       where
+                        y = backgroundY game
+                        y2 = background2Y game
+                        y' = if y <= -bgHeight
+                             then y2+bgHeight- bgScrollSpeed * seconds
+                             else y - bgScrollSpeed * seconds
+                        y'' = if y2 <= -bgHeight
+                              then y+bgHeight- bgScrollSpeed * seconds
+                              else y2 - bgScrollSpeed * seconds
+                        
 
 data VideoGame = Game
   { playerLoc :: (Float, Float) ,
@@ -31,7 +56,9 @@ data VideoGame = Game
     playerMovingRight :: Bool,
     playerMovingDown :: Bool,
     playerMovingLeft :: Bool,
-    meleeActive :: Bool
+    meleeActive :: Bool,
+    backgroundY :: Float,
+    background2Y :: Float
   } deriving Show 
   
 initialState :: VideoGame
@@ -41,18 +68,22 @@ initialState = Game
     playerMovingRight = False,
     playerMovingDown = False,
     playerMovingLeft = False,
-    meleeActive = False
+    meleeActive = False,
+    backgroundY = 0,
+    background2Y = bgHeight
   }
 
 render :: VideoGame -> Picture
 render game = 
-              pictures [translate bgx bgy bg, 
+              pictures [translate 0 bgy bg, 
+                        translate 0 bg2y bg2,
                         translate x y player, 
                         mkMelee leftX y,
                         mkMelee rightX y
                         ]
                where
-               (bgx, bgy) = (0, 0)
+               bgy = backgroundY game
+               bg2y = background2Y game
                (x,y) = playerLoc game
                player = color red $ rectangleSolid playerWidth playerHeight
 
@@ -130,4 +161,4 @@ main :: IO ()
 main = play window background fps initialState render handleKeys update
  where
   update :: Float -> VideoGame -> VideoGame
-  update seconds = movePlayer
+  update seconds = movePlayer . moveBG seconds
