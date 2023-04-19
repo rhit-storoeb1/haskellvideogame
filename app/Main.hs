@@ -48,6 +48,11 @@ bgScrollSpeed = 450
 bombTimerMax :: Float
 bombTimerMax = 125
 
+explosionColor :: Color
+explosionColor = yellow
+explosionRadius :: Float
+explosionRadius = 50
+
 moveBG seconds game = game {backgroundY = y',
                             background2Y = y''}
                        where
@@ -59,7 +64,96 @@ moveBG seconds game = game {backgroundY = y',
                         y'' = if y2 <= -bgHeight
                               then y+bgHeight- bgScrollSpeed * seconds
                               else y2 - bgScrollSpeed * seconds
+appendEnemy :: Enemy -> [Enemy] -> [Enemy]
+appendEnemy b [] = [b]
+appendEnemy b (x:xs) = x : appendEnemy b xs
                         
+data Enemy = Enemy {
+loc :: (Float, Float),
+velocity :: (Float, Float),
+exploding:: Bool,
+explodeDuration :: Float,
+health :: Float,
+updateEnemy :: (Enemy -> Enemy),
+enemyPic :: Picture,
+size :: (Float, Float)
+}
+
+enemyOneUpdater :: Enemy -> Enemy
+enemyOneUpdater enemy = enemy { loc = (x', y') , velocity = (xv', yv)}
+                         where
+                          (x,y) = loc enemy
+                          (xv, yv) = velocity enemy
+                          hitWall = (x >= (fromIntegral width / 4) && xv > 0) || (x <= -(fromIntegral width / 4) && xv < 0)
+                          xv' = if hitWall
+                                 then -xv                               
+                                 else xv
+                          x' = x + xv'
+                          y' = y + yv
+
+zigZagger = Enemy {
+loc = (-50, fromIntegral height + 100),
+velocity = (5, -5),
+exploding = False,
+explodeDuration = 15,
+health = 50,
+updateEnemy = enemyOneUpdater,
+enemyPic = unsafePerformIO $ loadBMP "assets/enemy1.bmp",
+size = (74, 100)
+}
+
+mkEnemy :: [Enemy] -> Picture
+mkEnemy [] = pictures []
+mkEnemy (enemy:rest) = 
+  pictures [drawnEnemy, restOfEnemies]
+  where
+    (x,y) = loc enemy
+    drawnEnemy = translate x y $ enemyPic enemy
+    restOfEnemies = mkEnemy rest
+    
+updatePlayerHealth :: [Enemy] -> Float
+updatePlayerHealth (firstEnemy:rest) = if (exploding firstEnemy)
+                                        then 1 + (updatePlayerHealth rest)
+                                        else (updatePlayerHealth rest)
+updatePlayerHealth [] = 0
+
+updateEnemies :: VideoGame -> VideoGame
+-- TODO: Detect collision with hero bullet's and hero's ship, if none continue updating
+updateEnemies game = game {enemies = updateEnemiesList e (playerLoc game), playerHealth = ph}
+                      where
+                       e = enemies game
+                       ph = (playerHealth game) - (updatePlayerHealth (enemies game))
+                       
+detectEnemyCollision :: Enemy -> (Float, Float) -> Enemy
+detectEnemyCollision enemy (x,y) = enemy {exploding = isExploding, velocity = (vx, vy), enemyPic = pic, explodeDuration = d}
+                                    where                                    
+                                     (ex, ey) = (loc enemy)
+                                     (w, h) = (size enemy)
+                                     isExploding = ((x + playerWidth / 2 >= ex - w / 2) && 
+                                        (x - playerWidth / 2 <= ex + w / 2) && 
+                                        (y + playerHeight / 2 >= ey - h / 2) && 
+                                        (y - playerHeight / 2 <= ey + h / 2)) || (exploding enemy)
+                                     (vx, vy) = if isExploding
+                                                 then (0, 0)
+                                                 else velocity enemy
+                                     pic = if isExploding
+                                            then color explosionColor $ circleSolid explosionRadius
+                                            else enemyPic enemy              
+                                     d = if isExploding
+                                            then (explodeDuration enemy) - 1
+                                            else (explodeDuration enemy)
+                                                                                                                                    
+updateEnemiesList :: [Enemy] -> (Float, Float) -> [Enemy]
+updateEnemiesList (firstEnemy:rest) (x, y) = newEnemyList
+                                      where
+                                       updateFunc = updateEnemy firstEnemy
+                                       newFirstEnemy = updateFunc firstEnemy
+                                       newFirstEnemyCollision = detectEnemyCollision newFirstEnemy (x,y)
+                                       restUpdated = updateEnemiesList rest (x,y)                                       
+                                       newEnemyList = if (explodeDuration firstEnemy) == 0
+                                                         then restUpdated
+                                                         else appendEnemy newFirstEnemyCollision restUpdated
+updateEnemiesList [] _ = []
 
 data VideoGame = Game
   { playerLoc :: (Float, Float) ,
@@ -77,8 +171,10 @@ data VideoGame = Game
     background2Y :: Float,
     shootTimer :: Int,
     bullets :: [Bullet],
-    shootMachineGun :: Bool
-  } deriving Show 
+    shootMachineGun :: Bool,
+    enemies :: [Enemy],
+    playerHealth :: Float
+  }
   
 initialState :: VideoGame
 initialState = Game
@@ -97,7 +193,9 @@ initialState = Game
     background2Y = bgHeight,
     shootTimer = 0,
     bullets = [],
-    shootMachineGun = False
+    shootMachineGun = False,
+    enemies = [zigZagger],
+    playerHealth = 100
   }
   
 
@@ -115,9 +213,13 @@ render game =
                         if (explosionActive game && explosionDuration game > 0) 
                          then translate bx by $ color explosionColor $ circleSolid explosionRadius
                          else blank,
-                        mkBullet (bullets game)
+                        mkBullet (bullets game),
+                        mkEnemy (enemies game),
+                        translate ((fromIntegral width / 2)-65) ((fromIntegral height / 2)-50) healthText
                         ]
                where
+               healthText :: Picture
+               healthText = color white $ scale 0.25 0.25 $ text (show (round (playerHealth game)))
                bgy = backgroundY game
                bg2y = background2Y game
                (x,y) = playerLoc game
@@ -125,8 +227,7 @@ render game =
                (bx, by) = bombLoc game
                frameNum = floor $ bombTimer game
                bombColor = if (frameNum `div` 10) `mod` 2 == 0 then black else red
-               explosionColor = yellow
-               explosionRadius = 50
+               
 
                leftX = x - 50
                rightX = x + 50
@@ -151,7 +252,8 @@ data Bullet = Bullet
     y :: Float,
     xv :: Float,
     yv :: Float,
-    damage :: Int
+    damage :: Int,
+    playerBullet :: Bool
   } deriving Show
 
 append :: Bullet -> [Bullet] -> [Bullet]
@@ -169,7 +271,8 @@ addBullet game = game { bullets = newBulletsList }
         y = by,
         xv = 0,
         yv = 30,
-        damage = 50
+        damage = 50,
+        playerBullet = True
       }
     newBulletsList = 
       if (time `mod` 10 == 1) 
@@ -190,7 +293,8 @@ moveBullets (bullet:rest) = newBulletsList
     y = (y bullet) + (yv bullet),
     xv = (xv bullet),
     yv = (yv bullet),
-    damage = (damage bullet)
+    damage = (damage bullet),
+    playerBullet = True
   }
 
   isNotOOB = (y newBullet) <= (fromIntegral height/2)
@@ -298,7 +402,7 @@ main :: IO ()
 main = play window background fps initialState render handleKeys update
  where
   update :: Float -> VideoGame -> VideoGame
-  update seconds = updateBullets . addBullet . updateTimer . movePlayer . moveBG seconds . updateBomb . checkExplosion
+  update seconds = updateBullets . addBullet . updateTimer . movePlayer . moveBG seconds . updateBomb . checkExplosion . updateEnemies
 
 
 
