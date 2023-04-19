@@ -5,6 +5,7 @@ import Graphics.Gloss.Data.ViewPort
 import Graphics.Gloss.Interface.Pure.Game
 import System.IO.Unsafe
 type Size = (Float, Float)
+
         
         
 width, height, offset :: Int
@@ -40,7 +41,6 @@ bg2 = unsafePerformIO $ loadBMP "assets/volcanoBGbigger.bmp"
 
 player :: Picture
 player = unsafePerformIO $ loadBMP "assets/orangeship3.bmp"
-
 
 bgScrollSpeed :: Float
 bgScrollSpeed = 450
@@ -79,8 +79,16 @@ enemyPic :: Picture,
 size :: (Float, Float)
 }
 
-enemyOneUpdater :: Enemy -> Enemy
-enemyOneUpdater enemy = enemy { loc = (x', y') , velocity = (xv', yv)}
+updateEnemyPosition :: Enemy -> Enemy
+updateEnemyPosition enemy = enemy { loc = (x', y')}
+                         where
+                          (x,y) = loc enemy
+                          (xv, yv) = velocity enemy
+                          x' = x + xv
+                          y' = y + yv
+
+bounceOffWall :: Enemy -> Enemy
+bounceOffWall enemy =   enemy { velocity = (xv', yv)}            
                          where
                           (x,y) = loc enemy
                           (xv, yv) = velocity enemy
@@ -88,8 +96,9 @@ enemyOneUpdater enemy = enemy { loc = (x', y') , velocity = (xv', yv)}
                           xv' = if hitWall
                                  then -xv                               
                                  else xv
-                          x' = x + xv'
-                          y' = y + yv
+
+enemyOneUpdater :: Enemy -> Enemy
+enemyOneUpdater = bounceOffWall . updateEnemyPosition
 
 zigZagger = Enemy {
 loc = (-50, fromIntegral height + 100),
