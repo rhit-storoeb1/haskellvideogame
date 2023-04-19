@@ -39,7 +39,7 @@ bg2 :: Picture
 bg2 = unsafePerformIO $ loadBMP "assets/volcanoBGbigger.bmp"
 
 player :: Picture
-player = unsafePerformIO $ loadBMP "assets/orangeship32.bmp"
+player = unsafePerformIO $ loadBMP "assets/orangeship3.bmp"
 
 
 bgScrollSpeed :: Float
@@ -185,7 +185,6 @@ moveBullets :: [Bullet] -> [Bullet]
 moveBullets [] = []
 moveBullets (bullet:rest) = newBulletsList
   where
-  -- add top wall collision detection here (I believe)
   newBullet = Bullet {
     x = (x bullet),
     y = (y bullet) + (yv bullet),
@@ -193,8 +192,22 @@ moveBullets (bullet:rest) = newBulletsList
     yv = (yv bullet),
     damage = (damage bullet)
   }
+
+  isNotOOB = (y newBullet) <= (fromIntegral height/2)
+  -- TODO: If bullet collides with enemy, remove it from the list
+  -- Note: This is just for the bullet. The enemy is going to have to handle dealing with damage
+  -- Note 2: in the order of update, the enemy will have to deal damage first, then the bullet will have to despawn
+  -- Order:
+  -- Frame 1: - Move Bullet to new location
+  --          - Enemy collides with bullet and damages itself
+  -- Frame 2: - Bullet detects collision with enemy and deletes itself before moving
+  --          - Enemy is no longer colliding with bullet and takes no damage
+
   restOfBullets = moveBullets rest
-  newBulletsList = append newBullet restOfBullets
+  newBulletsList = 
+    if isNotOOB 
+      then append newBullet restOfBullets 
+      else restOfBullets
 
 
 updateTimer :: VideoGame -> VideoGame
@@ -262,9 +275,6 @@ movePlayer game = game {playerLoc = (x', y')}
                              else moveY
                     x' = x + moveX'
                     y' = y + moveY'               
-                    
--- showMelee :: VideoGame -> VideoGame
--- bullets: take the picture passed in from render and do pictures [(pictures picture) ADD HERE]
 
 updateBomb :: VideoGame -> VideoGame
 updateBomb game = if (droppingBomb game)
