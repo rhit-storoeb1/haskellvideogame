@@ -128,7 +128,7 @@ updatePlayerHealth [] = 0
 
 updateEnemies :: VideoGame -> VideoGame
 -- TODO: Detect collision with hero bullet's and hero's ship, if none continue updating
-updateEnemies game = game {enemies = updateEnemiesList e (playerLoc game), playerHealth = ph}
+updateEnemies game = game {enemies = updateEnemiesList e game, playerHealth = ph}
                       where
                        e = enemies game
                        ph = (playerHealth game) - (updatePlayerHealth (enemies game))
@@ -151,17 +151,35 @@ detectEnemyCollision enemy (x,y) = enemy {exploding = isExploding, velocity = (v
                                      d = if isExploding
                                             then (explodeDuration enemy) - 1
                                             else (explodeDuration enemy)
+
+detectEnemyBulletCollision :: Enemy -> [Bullet] -> Enemy
+detectEnemyBulletCollision e [] = e
+detectEnemyBulletCollision enemy (bullet:rest) = newEnemy
+  where
+    (ex,ey) = (loc enemy)
+    (ew,eh) = (size enemy)
+    bx = x bullet
+    by = (y bullet)      
+    newEnemy = if bulletColliding 
+      then enemy { health = ((health enemy) - (fromIntegral (damage bullet))) }
+      else detectEnemyBulletCollision enemy rest
+    bulletColliding = ((ex + ew / 2 >= bx - smallBulletDims / 2) && 
+                       (ex - ew / 2 <= bx + smallBulletDims / 2) && 
+                       (ey + eh / 2 >= by - smallBulletDims / 2) && 
+                       (ey - eh / 2 <= by + smallBulletDims / 2))
                                                                                                                                     
-updateEnemiesList :: [Enemy] -> (Float, Float) -> [Enemy]
-updateEnemiesList (firstEnemy:rest) (x, y) = newEnemyList
+updateEnemiesList :: [Enemy] -> VideoGame -> [Enemy]
+updateEnemiesList (firstEnemy:rest) game = newEnemyList
                                       where
+                                       (x,y) = playerLoc game
                                        updateFunc = updateEnemy firstEnemy
                                        newFirstEnemy = updateFunc firstEnemy
                                        newFirstEnemyCollision = detectEnemyCollision newFirstEnemy (x,y)
-                                       restUpdated = updateEnemiesList rest (x,y)                                       
-                                       newEnemyList = if (explodeDuration firstEnemy) == 0
+                                       newFirstEnemyBulletCollision = detectEnemyBulletCollision newFirstEnemyCollision (bullets game)
+                                       restUpdated = updateEnemiesList rest game                                       
+                                       newEnemyList = if ((explodeDuration firstEnemy)==0 || ((health newFirstEnemyBulletCollision) <= 0))
                                                          then restUpdated
-                                                         else appendEnemy newFirstEnemyCollision restUpdated
+                                                         else appendEnemy newFirstEnemyBulletCollision restUpdated
 updateEnemiesList [] _ = []
 
 data VideoGame = Game
@@ -280,7 +298,7 @@ addBullet game = game { bullets = newBulletsList }
         y = by,
         xv = 0,
         yv = 30,
-        damage = 50,
+        damage = 5,
         playerBullet = True
       }
     newBulletsList = 
@@ -289,39 +307,49 @@ addBullet game = game { bullets = newBulletsList }
         else oldBullets
 
 updateBullets :: VideoGame -> VideoGame
-updateBullets game = game { bullets = newBullets }
+updateBullets game = ng
   where
-    newBullets = moveBullets (bullets game)
+    ng = moveBullets game
 
-moveBullets :: [Bullet] -> [Bullet]
-moveBullets [] = []
-moveBullets (bullet:rest) = newBulletsList
+moveBullets :: VideoGame -> VideoGame
+moveBullets game = 
+    if length (bullets game) == 0 
+      then game 
+    else newGame
+      where
+        bullet = head (bullets game)
+        rest = tail (bullets game)
+        newBullet = Bullet {
+          x = (x bullet),
+          y = (y bullet) + (yv bullet),
+          xv = (xv bullet),
+          yv = (yv bullet),
+          damage = (damage bullet),
+          playerBullet = True
+        }
+
+        isNotOOB = (y newBullet) <= (fromIntegral height/2)
+
+        enemyColliding = bulletCollidingWithEnemy newBullet (enemies game)
+
+        ng = moveBullets game { bullets = rest }
+        newGame = 
+          if isNotOOB && not(enemyColliding)
+            then game { bullets = append newBullet (bullets ng) }
+            else game { bullets = (bullets ng) } 
+
+bulletCollidingWithEnemy :: Bullet -> [Enemy] -> Bool
+bulletCollidingWithEnemy bullet [] = False
+bulletCollidingWithEnemy bullet (enemy:rest) = isColliding
   where
-  newBullet = Bullet {
-    x = (x bullet),
-    y = (y bullet) + (yv bullet),
-    xv = (xv bullet),
-    yv = (yv bullet),
-    damage = (damage bullet),
-    playerBullet = True
-  }
-
-  isNotOOB = (y newBullet) <= (fromIntegral height/2)
-  -- TODO: If bullet collides with enemy, remove it from the list
-  -- Note: This is just for the bullet. The enemy is going to have to handle dealing with damage
-  -- Note 2: in the order of update, the enemy will have to deal damage first, then the bullet will have to despawn
-  -- Order:
-  -- Frame 1: - Move Bullet to new location
-  --          - Enemy collides with bullet and damages itself
-  -- Frame 2: - Bullet detects collision with enemy and deletes itself before moving
-  --          - Enemy is no longer colliding with bullet and takes no damage
-
-  restOfBullets = moveBullets rest
-  newBulletsList = 
-    if isNotOOB 
-      then append newBullet restOfBullets 
-      else restOfBullets
-
+    (ex, ey) = loc enemy
+    (ew, eh) = size enemy
+    bx = x bullet
+    by = y bullet
+    isColliding = ((ex + ew / 2 >= bx - smallBulletDims / 2) && 
+                   (ex - ew / 2 <= bx + smallBulletDims / 2) && 
+                   (ey + eh / 2 >= by - smallBulletDims / 2) && 
+                   (ey - eh / 2 <= by + smallBulletDims / 2))
 
 updateTimer :: VideoGame -> VideoGame
 updateTimer game = game { shootTimer = newShootTimerVal }
