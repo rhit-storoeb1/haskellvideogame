@@ -76,7 +76,8 @@ explodeDuration :: Float,
 health :: Float,
 updateEnemy :: (Enemy -> Enemy),
 enemyPic :: Picture,
-size :: (Float, Float)
+size :: (Float, Float),
+enemyBullets :: [Bullet]
 }
 
 updateEnemyPosition :: Enemy -> Enemy
@@ -88,7 +89,7 @@ updateEnemyPosition enemy = enemy { loc = (x', y')}
                           y' = y + yv
 
 bounceOffWall :: Enemy -> Enemy
-bounceOffWall enemy =   enemy { velocity = (xv', yv)}            
+bounceOffWall enemy = enemy { velocity = (xv', yv), enemyBullets = newEnemyBullets }            
                          where
                           (x,y) = loc enemy
                           (xv, yv) = velocity enemy
@@ -96,19 +97,37 @@ bounceOffWall enemy =   enemy { velocity = (xv', yv)}
                           xv' = if hitWall
                                  then -xv                               
                                  else xv
+                          newEnemyBullets = if hitWall 
+                            then enemyShootBullet enemy 0 (-4) 10
+                            else (enemyBullets enemy) 
+
+enemyShootBullet :: Enemy -> Float -> Float -> Float -> [Bullet]
+enemyShootBullet enemy bxv byv bdamage = newEnemyBullets
+  where
+    (ex,ey) = loc enemy
+    (ew,eh) = size enemy
+    newBullet = Bullet {
+      x = ex,
+      y = ey-(eh/2),
+      xv = bxv,
+      yv = byv,
+      damage = round bdamage
+    }
+    newEnemyBullets = append newBullet (enemyBullets enemy)
 
 enemyOneUpdater :: Enemy -> Enemy
-enemyOneUpdater = bounceOffWall . updateEnemyPosition
+enemyOneUpdater = bounceOffWall . updateEnemyPosition . updateEnemyBullets
 
 zigZagger = Enemy {
 loc = (-50, fromIntegral height + 100),
-velocity = (5, -5),
+velocity = (5, -2),
 exploding = False,
 explodeDuration = 15,
 health = 50,
 updateEnemy = enemyOneUpdater,
 enemyPic = unsafePerformIO $ loadBMP "assets/enemy1.bmp",
-size = (74, 100)
+size = (74, 100),
+enemyBullets = []
 }
 
 mkEnemy :: [Enemy] -> Picture
@@ -119,7 +138,41 @@ mkEnemy (enemy:rest) =
     (x,y) = loc enemy
     drawnEnemy = translate x y $ enemyPic enemy
     restOfEnemies = mkEnemy rest
-    
+
+mkEnemyBullets :: [Enemy] -> Picture
+mkEnemyBullets [] = pictures []
+mkEnemyBullets (enemy:rest) = pictures [drawnEnemyBullet, restOfEnemyBullets]
+  where
+    drawnEnemyBullet = drawEnemyBullet (enemyBullets enemy)
+    restOfEnemyBullets = mkEnemyBullets rest
+
+drawEnemyBullet :: [Bullet] -> Picture
+drawEnemyBullet [] = pictures []
+drawEnemyBullet bullets = pictures [mkBullet bullets]
+
+updateEnemyBullets :: Enemy -> Enemy
+updateEnemyBullets enemy =
+  if length (enemyBullets enemy) == 0 
+      then enemy 
+    else newEnemy
+      where
+        bullet = head (enemyBullets enemy)
+        rest = tail (enemyBullets enemy)
+        newBullet = Bullet {
+          x = (x bullet),
+          y = (y bullet) + (yv bullet),
+          xv = (xv bullet),
+          yv = (yv bullet),
+          damage = (damage bullet)
+        }
+        isNotOOB = (y newBullet) <= (fromIntegral height/2) && (y newBullet) >= -(fromIntegral height/2)
+
+        ne = updateEnemyBullets enemy { enemyBullets = rest }
+        newEnemy = 
+          if isNotOOB
+            then enemy { enemyBullets = append newBullet (enemyBullets ne) }
+            else enemy { enemyBullets = (enemyBullets ne) } 
+
 updatePlayerHealth :: [Enemy] -> Float
 updatePlayerHealth (firstEnemy:rest) = if (exploding firstEnemy)
                                         then 1 + (updatePlayerHealth rest)
@@ -127,10 +180,10 @@ updatePlayerHealth (firstEnemy:rest) = if (exploding firstEnemy)
 updatePlayerHealth [] = 0
 
 updateEnemies :: VideoGame -> VideoGame
--- TODO: Detect collision with hero bullet's and hero's ship, if none continue updating
-updateEnemies game = game {enemies = updateEnemiesList e game, playerHealth = ph}
+updateEnemies game = game {enemies = newEnemy, playerHealth = ph}
                       where
                        e = enemies game
+                       newEnemy = updateEnemiesList e game
                        ph = (playerHealth game) - (updatePlayerHealth (enemies game))
                        
 detectEnemyCollision :: Enemy -> (Float, Float) -> Enemy
@@ -242,7 +295,8 @@ render game =
                          else blank,
                         mkBullet (bullets game),
                         mkEnemy (enemies game),
-                        translate ((fromIntegral width / 2)-65) ((fromIntegral height / 2)-50) healthText
+                        translate ((fromIntegral width / 2)-65) ((fromIntegral height / 2)-50) healthText,
+                        mkEnemyBullets (enemies game)
                         ]
                where
                healthText :: Picture
@@ -279,8 +333,7 @@ data Bullet = Bullet
     y :: Float,
     xv :: Float,
     yv :: Float,
-    damage :: Int,
-    playerBullet :: Bool
+    damage :: Int
   } deriving Show
 
 append :: Bullet -> [Bullet] -> [Bullet]
@@ -298,14 +351,13 @@ addBullet game = game { bullets = newBulletsList }
         y = by,
         xv = 0,
         yv = 30,
-        damage = 5,
-        playerBullet = True
+        damage = 5
       }
     newBulletsList = 
       if (time `mod` 10 == 1) 
         then append newBullet oldBullets
         else oldBullets
-
+-- todo: consolidate updateBullets and moveBullets
 updateBullets :: VideoGame -> VideoGame
 updateBullets game = ng
   where
@@ -324,8 +376,7 @@ moveBullets game =
           y = (y bullet) + (yv bullet),
           xv = (xv bullet),
           yv = (yv bullet),
-          damage = (damage bullet),
-          playerBullet = True
+          damage = (damage bullet)
         }
 
         isNotOOB = (y newBullet) <= (fromIntegral height/2)
@@ -350,6 +401,10 @@ bulletCollidingWithEnemy bullet (enemy:rest) = isColliding
                    (ex - ew / 2 <= bx + smallBulletDims / 2) && 
                    (ey + eh / 2 >= by - smallBulletDims / 2) && 
                    (ey - eh / 2 <= by + smallBulletDims / 2))
+
+-- detectHeroShot :: VideoGame -> VideoGame
+-- detectHeroShot game = game { enemies = newEnemies, playerHealth = newHealth }
+--   where
 
 updateTimer :: VideoGame -> VideoGame
 updateTimer game = game { shootTimer = newShootTimerVal }
