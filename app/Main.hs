@@ -4,15 +4,17 @@ import Graphics.Gloss
 import Graphics.Gloss.Data.ViewPort
 import Graphics.Gloss.Interface.Pure.Game
 import System.IO.Unsafe
-
+type Size = (Float, Float)
+        
+        
 width, height, offset :: Int
 width = round bgWidth - 5
 height = 950
 offset = 100
 
 playerWidth, playerHeight, playerSpeed :: Float
-playerWidth = 50
-playerHeight = 75
+playerWidth = 51
+playerHeight = 90
 playerSpeed = 5
 
 meleeWidth, meleeHeight :: Float
@@ -34,11 +36,14 @@ bg2 :: Picture
 bg2 = unsafePerformIO $ loadBMP "assets/volcanoBGbigger.bmp"
 
 player :: Picture
-player = unsafePerformIO $ loadBMP "assets/orangeship3.bmp"
+player = unsafePerformIO $ loadBMP "assets/orangeship32.bmp"
 
 
 bgScrollSpeed :: Float
 bgScrollSpeed = 450
+
+bombTimerMax :: Float
+bombTimerMax = 125
 
 moveBG seconds game = game {backgroundY = y',
                             background2Y = y''}
@@ -60,6 +65,11 @@ data VideoGame = Game
     playerMovingDown :: Bool,
     playerMovingLeft :: Bool,
     meleeActive :: Bool,
+    droppingBomb :: Bool,
+    bombLoc :: (Float, Float),
+    bombTimer :: Float,
+    explosionActive :: Bool,
+    explosionDuration :: Float,
     backgroundY :: Float,
     background2Y :: Float
   } deriving Show 
@@ -72,6 +82,11 @@ initialState = Game
     playerMovingDown = False,
     playerMovingLeft = False,
     meleeActive = False,
+    droppingBomb = False,
+    bombLoc = (0, 0),
+    bombTimer = bombTimerMax,
+    explosionActive = False,
+    explosionDuration = 10,
     backgroundY = 0,
     background2Y = bgHeight
   }
@@ -84,12 +99,24 @@ render game =
                         translate 0 bg2y bg2,
                         translate x y player, 
                         mkMelee leftX y,
-                        mkMelee rightX y
+                        mkMelee rightX y,
+                        if (droppingBomb game)
+                         then translate bx by $ color bombColor $ circleSolid 10
+                         else blank,
+                        if (explosionActive game && explosionDuration game > 0) 
+                         then translate bx by $ color explosionColor $ circleSolid explosionRadius
+                         else blank
                         ]
                where
                bgy = backgroundY game
                bg2y = background2Y game
                (x,y) = playerLoc game
+               
+               (bx, by) = bombLoc game
+               frameNum = floor $ bombTimer game
+               bombColor = if (frameNum `div` 10) `mod` 2 == 0 then black else red
+               explosionColor = yellow
+               explosionRadius = 50
 
                leftX = x - 50
                rightX = x + 50
@@ -121,6 +148,10 @@ handleKeys (EventKey (Char 'd') Up _ _) game = game {playerMovingRight = False}
 
 handleKeys (EventKey (Char 'k') Down _ _) game = game {meleeActive = True}
 handleKeys (EventKey (Char 'k') Up _ _) game = game {meleeActive = False}
+
+handleKeys (EventKey (Char 'h') Down _ _) game = if droppingBomb game
+                                                  then game
+                                                  else game {droppingBomb = True, bombLoc = playerLoc game, explosionDuration = 10, explosionActive = False}
 
 handleKeys _ game = game
 
@@ -157,10 +188,46 @@ movePlayer game = game {playerLoc = (x', y')}
 -- showMelee :: VideoGame -> VideoGame
 -- bullets: take the picture passed in from render and do pictures [(pictures picture) ADD HERE]
 
+updateBomb :: VideoGame -> VideoGame
+updateBomb game = if (droppingBomb game)
+                  then 
+                   if (bombTimer game) <= 0
+                   then game {droppingBomb = False, bombTimer = bombTimerMax}
+                   else game {bombTimer = (bombTimer game) - 1}
+                  else game
+                  
+checkExplosion :: VideoGame -> VideoGame                 
+checkExplosion game =
+      if (bombTimer game <= 0)
+       then game { explosionActive = True , explosionDuration = 10}
+       else if (explosionActive game && explosionDuration game <= 0)
+        then game { explosionActive = False, explosionDuration = 0 }
+         else game { explosionDuration = max 0 $ explosionDuration game - 1 }
+
 
 
 main :: IO ()
 main = play window background fps initialState render handleKeys update
  where
   update :: Float -> VideoGame -> VideoGame
-  update seconds = movePlayer . moveBG seconds
+  update seconds = movePlayer . moveBG seconds . updateBomb . checkExplosion
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
