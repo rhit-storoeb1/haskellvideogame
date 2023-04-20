@@ -381,7 +381,7 @@ moveBullets game =
 
         isNotOOB = (y newBullet) <= (fromIntegral height/2)
 
-        enemyColliding = bulletCollidingWithEnemy newBullet (enemies game)
+        enemyColliding = bulletCollidingWithEnemy bullet (enemies game)
 
         ng = moveBullets game { bullets = rest }
         newGame = 
@@ -494,7 +494,7 @@ main :: IO ()
 main = play window background fps initialState render handleKeys update
  where
   update :: Float -> VideoGame -> VideoGame
-  update seconds = updateBullets . addBullet . updateTimer . movePlayer . moveBG seconds . updateBomb . checkExplosion . updateEnemies
+  update seconds =  addBullet . updateTimer . movePlayer . moveBG seconds . updateBomb . checkExplosion . updateEnemies . updateBullets
 
 
 
