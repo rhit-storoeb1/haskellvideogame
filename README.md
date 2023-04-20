@@ -20,9 +20,9 @@
 # Enemy Data
 
 ## Enemy 1
-- Health:
-- Weapon:
-- Movment Pattern:
+- Health: 50
+- Weapon: weak bullets shot straight
+- Movment Pattern: zig zag through the middle of the screen
 
 ## Enemy 2
 - Health:
