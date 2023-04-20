@@ -118,17 +118,51 @@ enemyShootBullet enemy bxv byv bdamage = newEnemyBullets
 enemyOneUpdater :: Enemy -> Enemy
 enemyOneUpdater = bounceOffWall . updateEnemyPosition . updateEnemyBullets
 
+-- todo: cycle through enemies endlessly
+
 zigZagger = Enemy {
-loc = (-50, fromIntegral height + 100),
-velocity = (5, -2),
-exploding = False,
-explodeDuration = 15,
-health = 50,
-updateEnemy = enemyOneUpdater,
-enemyPic = unsafePerformIO $ loadBMP "assets/enemy1.bmp",
-size = (74, 100),
-enemyBullets = []
+  loc = (-100, fromIntegral height + 100),
+  velocity = (5, -2),
+  exploding = False,
+  explodeDuration = 15,
+  health = 50,
+  updateEnemy = enemyOneUpdater,
+  enemyPic = unsafePerformIO $ loadBMP "assets/enemy1.bmp",
+  size = (74, 100),
+  enemyBullets = []
 }
+
+accelerator = Enemy {
+  loc = (-250, ((fromIntegral height) + 200)),
+  velocity = (3, (-1)),
+  exploding = False,
+  explodeDuration = 15,
+  health = 30,
+  updateEnemy = acceleratorUpdater,
+  enemyPic = unsafePerformIO $ loadBMP "assets/enemy2.bmp",
+  size = (115, 120),
+  enemyBullets = []
+}
+
+acceleratorUpdater :: Enemy -> Enemy
+acceleratorUpdater = accelerateY . updateEnemyPosition . updateEnemyBullets
+
+accelerateY :: Enemy -> Enemy
+accelerateY enemy = enemy { velocity = (xv', yv')}  
+  where
+    accelerateAmount = 0.05
+    (ex, ey) = loc enemy
+    (xv, yv) = velocity enemy
+    xv' = 
+      if (ey > fromIntegral height/2)
+        then 0
+      else if (ex >= (fromIntegral width)/2 - 70)
+        then 0
+      else 3
+    yv' = 
+      if (ey > fromIntegral height/2)
+        then yv
+      else yv - accelerateAmount
 
 mkEnemy :: [Enemy] -> Picture
 mkEnemy [] = pictures []
@@ -274,7 +308,7 @@ initialState = Game
     shootTimer = 0,
     bullets = [],
     shootMachineGun = False,
-    enemies = [zigZagger],
+    enemies = [zigZagger, accelerator],
     playerHealth = 100
   }
   
@@ -494,7 +528,7 @@ main :: IO ()
 main = play window background fps initialState render handleKeys update
  where
   update :: Float -> VideoGame -> VideoGame
-  update seconds =  addBullet . updateTimer . movePlayer . moveBG seconds . updateBomb . checkExplosion . updateEnemies . updateBullets
+  update seconds =  updateBullets . addBullet . updateTimer . movePlayer . moveBG seconds . updateBomb . checkExplosion . updateEnemies
 
 
 
