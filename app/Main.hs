@@ -312,7 +312,8 @@ data VideoGame = Game
     bullets :: [Bullet],
     shootMachineGun :: Bool,
     enemies :: [Enemy],
-    playerHealth :: Float
+    playerHealth :: Float,
+    gameOver :: Bool 
   }
   
 initialState :: VideoGame
@@ -334,7 +335,8 @@ initialState = Game
     bullets = [],
     shootMachineGun = False,
     enemies = [zigZagger, accelerator],
-    playerHealth = 100
+    playerHealth = 100,
+    gameOver = False
   }
   
 
@@ -355,11 +357,16 @@ render game =
                         mkBullet (bullets game),
                         mkEnemy (enemies game),
                         translate ((fromIntegral width / 2)-65) ((fromIntegral height / 2)-50) healthText,
-                        mkEnemyBullets (enemies game)
+                        mkEnemyBullets (enemies game),
+                        if (gameOver game) then translate (-100) 0 gameOverText else blank
                         ]
                where
                healthText :: Picture
                healthText = color white $ scale 0.25 0.25 $ text (show (round (playerHealth game)))
+
+               gameOverText :: Picture
+               gameOverText = color black $ scale 0.25 0.25 $ text "GAME OVER"
+
                bgy = backgroundY game
                bg2y = background2Y game
                (x,y) = playerLoc game
@@ -496,6 +503,11 @@ checkEachIndividualEnemyBullet (bullet:rest) (px,py) = newBullets
         restOfBullets
       else append bullet restOfBullets
 
+detectGameOver :: VideoGame -> VideoGame
+detectGameOver game = game { gameOver = isGameOver }
+  where
+    isGameOver = (playerHealth game) <= 0
+
 updateTimer :: VideoGame -> VideoGame
 updateTimer game = game { shootTimer = newShootTimerVal }
   where
@@ -529,6 +541,8 @@ handleKeys (EventKey (Char 'j') Down _ _) game = if droppingBomb game
                                                   else game {droppingBomb = True, bombLoc = playerLoc game, explosionDuration = 10, explosionActive = False}
 handleKeys (EventKey (Char 'h') Down _ _) game = game {shootMachineGun = True}
 handleKeys (EventKey (Char 'h') Up _ _) game = game {shootMachineGun = False}
+
+handleKeys (EventKey (Char 'n') Up _ _) game = initialState
 
 handleKeys _ game = game
 
@@ -584,5 +598,7 @@ main :: IO ()
 main = play window background fps initialState render handleKeys update
  where
   update :: Float -> VideoGame -> VideoGame
-  update seconds =  detectHeroShot . updateBullets . addBullet . updateTimer . movePlayer . moveBG seconds . updateBomb . checkExplosion . updateEnemies
+  update seconds game = if not((gameOver game) )
+    then (detectGameOver . detectHeroShot . updateBullets . addBullet . updateTimer . movePlayer . moveBG seconds . updateBomb . checkExplosion . updateEnemies) game
+    else game
 
