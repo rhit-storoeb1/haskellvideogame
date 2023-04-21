@@ -254,19 +254,41 @@ detectEnemyBulletCollision enemy (bullet:rest) = newEnemy
                        (ex - ew / 2 <= bx + smallBulletDims / 2) && 
                        (ey + eh / 2 >= by - smallBulletDims / 2) && 
                        (ey - eh / 2 <= by + smallBulletDims / 2))
+
+detectEnemyMeleeCollision :: Enemy -> (Float, Float) -> Bool -> Enemy
+detectEnemyMeleeCollision enemy (px, py) meleeActive = enemy {health = newHealth}
+  where
+    (ex, ey) = loc enemy
+    (ew, eh) = size enemy
+    leftX = px - 50
+    rightX = px + 50
+    newHealth = if (((ex + ew / 2 >= leftX - meleeWidth / 2) && 
+                       (ex - ew / 2 <= leftX + meleeWidth / 2) && 
+                       (ey + eh / 2 >= py - meleeHeight / 2) && 
+                       (ey - eh / 2 <= py + meleeHeight / 2)) ||
+                   ((ex + ew / 2 >= rightX - meleeWidth / 2) && 
+                       (ex - ew / 2 <= rightX + meleeWidth / 2) && 
+                       (ey + eh / 2 >= py - meleeHeight / 2) && 
+                       (ey - eh / 2 <= py + meleeHeight / 2))) &&
+                       meleeActive
+                  then (health enemy) - 1
+                else (health enemy)
                                                                                                                                     
 updateEnemiesList :: [Enemy] -> VideoGame -> [Enemy]
 updateEnemiesList (firstEnemy:rest) game = newEnemyList
                                       where
                                        (x,y) = playerLoc game
+                                       
                                        updateFunc = updateEnemy firstEnemy
                                        newFirstEnemy = updateFunc firstEnemy
                                        newFirstEnemyCollision = detectEnemyCollision newFirstEnemy (x,y)
                                        newFirstEnemyBulletCollision = detectEnemyBulletCollision newFirstEnemyCollision (bullets game)
+                                       newFirstEnemyMeleeCollision = detectEnemyMeleeCollision newFirstEnemyBulletCollision (playerLoc game) (meleeActive game)
+
                                        restUpdated = updateEnemiesList rest game                                       
-                                       newEnemyList = if ((explodeDuration firstEnemy)==0 || ((health newFirstEnemyBulletCollision) <= 0))
+                                       newEnemyList = if ((explodeDuration firstEnemy)==0 || ((health newFirstEnemyMeleeCollision) <= 0))
                                                          then restUpdated
-                                                         else appendEnemy newFirstEnemyBulletCollision restUpdated
+                                                         else appendEnemy newFirstEnemyMeleeCollision restUpdated
 updateEnemiesList [] _ = []
 
 data VideoGame = Game
