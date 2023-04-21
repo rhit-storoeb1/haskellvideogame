@@ -6,8 +6,6 @@ import Graphics.Gloss.Interface.Pure.Game
 import System.IO.Unsafe
 type Size = (Float, Float)
 
-        
-        
 width, height, offset :: Int
 width = round bgWidth - 5
 height = 950
@@ -28,7 +26,6 @@ smallBulletDims = 10
 bgHeight, bgWidth :: Float
 bgHeight = 2572
 bgWidth = 619
-
 
 window :: Display
 window = InWindow "Game" (width, height) (offset, offset)
@@ -117,8 +114,6 @@ enemyShootBullet enemy bxv byv bdamage = newEnemyBullets
 
 enemyOneUpdater :: Enemy -> Enemy
 enemyOneUpdater = bounceOffWall . updateEnemyPosition . updateEnemyBullets
-
--- todo: cycle through enemies endlessly
 
 zigZagger = Enemy {
   loc = (-100, fromIntegral height + 50),
@@ -274,7 +269,7 @@ detectEnemyMeleeCollision enemy (px, py) meleeActive = enemy {health = newHealth
                        (ey + eh / 2 >= py - meleeHeight / 2) && 
                        (ey - eh / 2 <= py + meleeHeight / 2))) &&
                        meleeActive
-                  then (health enemy) - 1
+                  then (health enemy) - 5
                 else (health enemy)
                                                                                                                                     
 updateEnemiesList :: [Enemy] -> VideoGame -> [Enemy]
@@ -344,8 +339,6 @@ initialState = Game
     gameOver = False,
     gameTimer = 0
   }
-  
-
 
 render :: VideoGame -> Picture
 render game = 
