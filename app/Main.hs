@@ -121,7 +121,7 @@ enemyOneUpdater = bounceOffWall . updateEnemyPosition . updateEnemyBullets
 -- todo: cycle through enemies endlessly
 
 zigZagger = Enemy {
-  loc = (-100, fromIntegral height + 100),
+  loc = (-100, fromIntegral height + 50),
   velocity = (5, -2),
   exploding = False,
   explodeDuration = 15,
@@ -133,11 +133,11 @@ zigZagger = Enemy {
 }
 
 accelerator = Enemy {
-  loc = (-250, ((fromIntegral height) + 200)),
+  loc = (-250, ((fromIntegral height) + 10)),
   velocity = (3, (-1)),
   exploding = False,
   explodeDuration = 15,
-  health = 30,
+  health = 75,
   updateEnemy = acceleratorUpdater,
   enemyPic = unsafePerformIO $ loadBMP "assets/enemy2.bmp",
   size = (115, 120),
@@ -163,7 +163,7 @@ accelerateY enemy = enemy { velocity = (xv', yv'), enemyBullets = newEnemyBullet
       if (ey > fromIntegral height/2)
         then yv
       else yv - accelerateAmount
-    newEnemyBullets = if ((round ex)+250) `mod` 60 == 0
+    newEnemyBullets = if ((round ex)+250) `mod` 90 == 0
       then enemyShootBullet enemy 0 (-10) 15
     else (enemyBullets enemy)
 
@@ -288,8 +288,12 @@ updateEnemiesList (firstEnemy:rest) game = newEnemyList
                                        newFirstEnemyBulletCollision = detectEnemyBulletCollision newFirstEnemyCollision (bullets game)
                                        newFirstEnemyMeleeCollision = detectEnemyMeleeCollision newFirstEnemyBulletCollision (playerLoc game) (meleeActive game)
 
+                                       (ex, ey) = (loc newFirstEnemyMeleeCollision)
+                                       (ew, eh) = (size newFirstEnemyMeleeCollision)
+                                       enemyOffScreen = ey <= (-fromIntegral height/2) - eh
+
                                        restUpdated = updateEnemiesList rest game                                       
-                                       newEnemyList = if ((explodeDuration firstEnemy)==0 || ((health newFirstEnemyMeleeCollision) <= 0))
+                                       newEnemyList = if ((explodeDuration firstEnemy)==0 || ((health newFirstEnemyMeleeCollision) <= 0)) || enemyOffScreen
                                                          then restUpdated
                                                          else appendEnemy newFirstEnemyMeleeCollision restUpdated
 updateEnemiesList [] _ = []
@@ -313,7 +317,8 @@ data VideoGame = Game
     shootMachineGun :: Bool,
     enemies :: [Enemy],
     playerHealth :: Float,
-    gameOver :: Bool 
+    gameOver :: Bool,
+    gameTimer :: Int
   }
   
 initialState :: VideoGame
@@ -334,9 +339,10 @@ initialState = Game
     shootTimer = 0,
     bullets = [],
     shootMachineGun = False,
-    enemies = [zigZagger, accelerator],
+    enemies = [],
     playerHealth = 100,
-    gameOver = False
+    gameOver = False,
+    gameTimer = 0
   }
   
 
@@ -417,20 +423,15 @@ addBullet game = game { bullets = newBulletsList }
         y = by,
         xv = 0,
         yv = 30,
-        damage = 5
+        damage = 2
       }
     newBulletsList = 
       if (time `mod` 10 == 1) 
         then append newBullet oldBullets
         else oldBullets
--- todo: consolidate updateBullets and moveBullets
-updateBullets :: VideoGame -> VideoGame
-updateBullets game = ng
-  where
-    ng = moveBullets game
 
-moveBullets :: VideoGame -> VideoGame
-moveBullets game = 
+updateBullets :: VideoGame -> VideoGame
+updateBullets game = 
     if length (bullets game) == 0 
       then game 
     else newGame
@@ -449,7 +450,7 @@ moveBullets game =
 
         enemyColliding = bulletCollidingWithEnemy bullet (enemies game)
 
-        ng = moveBullets game { bullets = rest }
+        ng = updateBullets game { bullets = rest }
         newGame = 
           if isNotOOB && not(enemyColliding)
             then game { bullets = append newBullet (bullets ng) }
@@ -476,7 +477,6 @@ detectHeroShot game = if ((length (enemies game)) == 0)
       first = head (enemies game)
       bullets = (enemyBullets first)
       originalSize = length bullets
-      
       singleBulletDamage = if (originalSize>0 ) then (damage (head bullets)) else 0
       newBullets = checkEachIndividualEnemyBullet bullets (playerLoc game)
       sizeChange = originalSize - (length newBullets)
@@ -507,6 +507,31 @@ detectGameOver :: VideoGame -> VideoGame
 detectGameOver game = game { gameOver = isGameOver }
   where
     isGameOver = (playerHealth game) <= 0
+
+incrementGameTimer :: VideoGame -> VideoGame
+incrementGameTimer game = game { gameTimer = (gameTimer game) + 1}
+
+spawnEnemies :: VideoGame -> VideoGame
+spawnEnemies game = game {enemies = newEnemies}
+  where
+    randomSeed = (gameTimer game) `mod` totalEnemies
+    
+    (_,zy) = loc zigZagger
+    zXLoc = ((-100 + (fromIntegral ((gameTimer game) `mod` 5)) * 40))
+    zYLoc = (((zy-20) + (fromIntegral ((gameTimer game) `mod` 5)) * 50))
+    randomZigZagger = zigZagger { loc = (zXLoc, zYLoc) }
+
+    (ax,ay) = loc accelerator
+    aYLoc = (((ay-20) + (fromIntegral ((gameTimer game) `mod` 5)) * 100))
+    randomAccelerator = accelerator { loc = (ax, aYLoc) } 
+    
+    
+    possibleEnemies = [randomZigZagger,randomAccelerator]
+    totalEnemies = length possibleEnemies
+    
+    newEnemies = if (length (enemies game) < 5)
+      then appendEnemy (possibleEnemies!!randomSeed) (enemies game)
+      else (enemies game)
 
 updateTimer :: VideoGame -> VideoGame
 updateTimer game = game { shootTimer = newShootTimerVal }
@@ -599,6 +624,6 @@ main = play window background fps initialState render handleKeys update
  where
   update :: Float -> VideoGame -> VideoGame
   update seconds game = if not((gameOver game) )
-    then (detectGameOver . detectHeroShot . updateBullets . addBullet . updateTimer . movePlayer . moveBG seconds . updateBomb . checkExplosion . updateEnemies) game
+    then (detectGameOver . detectHeroShot . updateBullets . addBullet . updateTimer . movePlayer . moveBG seconds . updateBomb . checkExplosion . updateEnemies . spawnEnemies . incrementGameTimer) game
     else game
 
