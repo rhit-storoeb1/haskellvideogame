@@ -139,6 +139,42 @@ accelerator = Enemy {
   enemyBullets = []
 }
 
+-- one bullet show down middle, and one diagonally left, and one diagonally right
+boss = Enemy {
+  loc = (0, fromIntegral(round(((fromIntegral height/2) + 10)))),
+  velocity = (0, -1),
+  exploding = False,
+  explodeDuration = 15,
+  health = 500,
+  updateEnemy = bossUpdater,
+  enemyPic = unsafePerformIO $ loadBMP "assets/enemy3.bmp",
+  size = (221,250),
+  enemyBullets = []
+}
+
+bossUpdater :: Enemy -> Enemy
+bossUpdater = moveBoss . updateEnemyPosition . updateEnemyBullets
+
+moveBoss :: Enemy -> Enemy
+moveBoss enemy = enemy {velocity = (xv', yv'), loc = (nex, ney)} -- enemyBullets = newEnemyBullets }
+  where
+    speed = 1
+    (ex, ey) = loc enemy
+    (ew, eh) = size enemy
+    (xv, yv) = velocity enemy
+    (xv', yv', nex, ney) = 
+      if ((ey <= (fromIntegral height/2) - 100) && (ey >= (fromIntegral height/2) - 102)) && (ex > -(fromIntegral width/2)+(ew/2)+20)
+        then (-speed, 0, ex, ey)
+      else if (ex <= -(fromIntegral width/2)+(ew/2)+20)
+        then if (((round ey) `mod` 100) == 0)
+          then (speed, 0, ex, ey-speed)
+          else (0, (-speed), ex, ey)
+      else if ex >= (fromIntegral width/2)-(ew/2)-20
+        then if (((round ey) `mod` 100) == 0)
+          then (-speed, 0, ex, ey-speed)
+          else (0, (-speed), ex, ey)
+      else (xv, yv, ex, ey)
+
 acceleratorUpdater :: Enemy -> Enemy
 acceleratorUpdater = accelerateY . updateEnemyPosition . updateEnemyBullets
 
@@ -313,7 +349,8 @@ data VideoGame = Game
     enemies :: [Enemy],
     playerHealth :: Float,
     gameOver :: Bool,
-    gameTimer :: Int
+    gameTimer :: Int,
+    isBossSpawned :: Bool
   }
   
 initialState :: VideoGame
@@ -337,7 +374,8 @@ initialState = Game
     enemies = [],
     playerHealth = 100,
     gameOver = False,
-    gameTimer = 0
+    gameTimer = 0,
+    isBossSpawned = False
   }
 
 render :: VideoGame -> Picture
@@ -519,10 +557,11 @@ spawnEnemies game = game {enemies = newEnemies}
     randomAccelerator = accelerator { loc = (ax, aYLoc) } 
     
     
-    possibleEnemies = [randomZigZagger,randomAccelerator]
+    -- possibleEnemies = [randomZigZagger,randomAccelerator]
+    possibleEnemies = [boss]
     totalEnemies = length possibleEnemies
     
-    newEnemies = if (length (enemies game) < 5)
+    newEnemies = if (length (enemies game) < 1)
       then appendEnemy (possibleEnemies!!randomSeed) (enemies game)
       else (enemies game)
 
