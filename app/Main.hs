@@ -148,7 +148,7 @@ acceleratorUpdater :: Enemy -> Enemy
 acceleratorUpdater = accelerateY . updateEnemyPosition . updateEnemyBullets
 
 accelerateY :: Enemy -> Enemy
-accelerateY enemy = enemy { velocity = (xv', yv')}  
+accelerateY enemy = enemy { velocity = (xv', yv'), enemyBullets = newEnemyBullets}  
   where
     accelerateAmount = 0.05
     (ex, ey) = loc enemy
@@ -163,6 +163,9 @@ accelerateY enemy = enemy { velocity = (xv', yv')}
       if (ey > fromIntegral height/2)
         then yv
       else yv - accelerateAmount
+    newEnemyBullets = if ((round ex)+250) `mod` 60 == 0
+      then enemyShootBullet enemy 0 (-10) 15
+    else (enemyBullets enemy)
 
 mkEnemy :: [Enemy] -> Picture
 mkEnemy [] = pictures []
