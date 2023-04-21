@@ -461,9 +461,40 @@ bulletCollidingWithEnemy bullet (enemy:rest) = isColliding
                    (ey + eh / 2 >= by - smallBulletDims / 2) && 
                    (ey - eh / 2 <= by + smallBulletDims / 2))
 
--- detectHeroShot :: VideoGame -> VideoGame
--- detectHeroShot game = game { enemies = newEnemies, playerHealth = newHealth }
---   where
+detectHeroShot :: VideoGame -> VideoGame
+detectHeroShot game = if ((length (enemies game)) == 0)
+  then game
+  else finishedGame
+    where
+      first = head (enemies game)
+      bullets = (enemyBullets first)
+      originalSize = length bullets
+      
+      singleBulletDamage = if (originalSize>0 ) then (damage (head bullets)) else 0
+      newBullets = checkEachIndividualEnemyBullet bullets (playerLoc game)
+      sizeChange = originalSize - (length newBullets)
+      damageDealt = singleBulletDamage * sizeChange
+
+      newFirstEnemy = first {enemyBullets = newBullets}
+      rest = tail (enemies game)
+      restOfEnemies = detectHeroShot game { enemies = rest, playerHealth = (playerHealth game) - (fromIntegral damageDealt)}
+      appendedEnemies = appendEnemy newFirstEnemy (enemies restOfEnemies)
+      finishedGame = game {enemies = appendedEnemies, playerHealth = (playerHealth restOfEnemies)}
+
+checkEachIndividualEnemyBullet :: [Bullet] -> (Float, Float) -> [Bullet]
+checkEachIndividualEnemyBullet [] (px,py) = []
+checkEachIndividualEnemyBullet (bullet:rest) (px,py) = newBullets
+  where
+    bx = x bullet
+    by = y bullet
+    restOfBullets = checkEachIndividualEnemyBullet rest (px, py)
+    newBullets = if ((px + playerWidth / 2 >= bx - smallBulletDims / 2) && 
+        (px - playerWidth / 2 <= bx + smallBulletDims / 2) && 
+        (py + playerHeight / 2 >= by - smallBulletDims / 2) && 
+        (py - playerHeight / 2 <= by + smallBulletDims / 2))
+      then
+        restOfBullets
+      else append bullet restOfBullets
 
 updateTimer :: VideoGame -> VideoGame
 updateTimer game = game { shootTimer = newShootTimerVal }
@@ -553,24 +584,5 @@ main :: IO ()
 main = play window background fps initialState render handleKeys update
  where
   update :: Float -> VideoGame -> VideoGame
-  update seconds =  updateBullets . addBullet . updateTimer . movePlayer . moveBG seconds . updateBomb . checkExplosion . updateEnemies
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  update seconds =  detectHeroShot . updateBullets . addBullet . updateTimer . movePlayer . moveBG seconds . updateBomb . checkExplosion . updateEnemies
 
