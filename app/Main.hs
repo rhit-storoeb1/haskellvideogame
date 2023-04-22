@@ -169,11 +169,10 @@ moveBoss enemy = enemy {velocity = (xv', yv'), loc = (nex, ney), enemyBullets = 
     enemyShootBulletOne = enemy {enemyBullets = (enemyShootBullet enemy 0 (-10) 10)}
     enemyShootBulletTwo = enemyShootBulletOne {enemyBullets = (enemyShootBullet enemyShootBulletOne 5 (-5) 10)}
     bulletsList = enemyBullets enemyShootBulletTwo {enemyBullets = (enemyShootBullet enemyShootBulletTwo (-5) (-5) 10)}
-    newBullets =
-      if shootingBullet
-        then bulletsList
-      else enemyBullets enemy
-
+    newBullets = if shootingBullet
+               then bulletsList
+               else enemyBullets enemy
+    
     (xv', yv', nex, ney) = 
       if ((ey <= (fromIntegral height/2) - 100) && (ey >= (fromIntegral height/2) - 102)) && (ex > -(fromIntegral width/2)+(ew/2)+20)
         then (-speed, 0, ex, ey)
@@ -319,6 +318,25 @@ detectEnemyMeleeCollision enemy (px, py) meleeActive = enemy {health = newHealth
                        meleeActive
                   then (health enemy) - 2
                 else (health enemy)
+                
+detectEnemyBombCollision enemy (px, py) explosionActive = enemy {health = newHealth}
+  where
+    (ex, ey) = loc enemy
+    (ew, eh) = size enemy
+    radius = explosionRadius
+    leftX = px - 50
+    rightX = px + 50
+    newHealth = if (((ex + ew / 2 >= leftX - radius / 2) && 
+                       (ex - ew / 2 <= leftX + radius / 2) && 
+                       (ey + eh / 2 >= py - radius / 2) && 
+                       (ey - eh / 2 <= py + radius / 2)) ||
+                   ((ex + ew / 2 >= rightX - radius / 2) && 
+                       (ex - ew / 2 <= rightX + radius / 2) && 
+                       (ey + eh / 2 >= py - radius / 2) && 
+                       (ey - eh / 2 <= py + radius / 2))) &&
+                       explosionActive
+                  then (health enemy) - 20
+                else (health enemy)                 
                                                                                                                                     
 updateEnemiesList :: [Enemy] -> VideoGame -> [Enemy]
 updateEnemiesList (firstEnemy:rest) game = newEnemyList
@@ -330,15 +348,17 @@ updateEnemiesList (firstEnemy:rest) game = newEnemyList
                                        newFirstEnemyCollision = detectEnemyCollision newFirstEnemy (x,y)
                                        newFirstEnemyBulletCollision = detectEnemyBulletCollision newFirstEnemyCollision (bullets game)
                                        newFirstEnemyMeleeCollision = detectEnemyMeleeCollision newFirstEnemyBulletCollision (playerLoc game) (meleeActive game)
+                                       -- TODO: detectEnemyBombCollision
+                                       newFirstEnemyBombCollision = detectEnemyBombCollision newFirstEnemyMeleeCollision (bombLoc game) (explosionActive game) 
 
-                                       (ex, ey) = (loc newFirstEnemyMeleeCollision)
-                                       (ew, eh) = (size newFirstEnemyMeleeCollision)
+                                       (ex, ey) = (loc newFirstEnemyBombCollision)
+                                       (ew, eh) = (size newFirstEnemyBombCollision)
                                        enemyOffScreen = ey <= (-fromIntegral height/2) - eh
 
                                        restUpdated = updateEnemiesList rest game                                       
-                                       newEnemyList = if ((explodeDuration firstEnemy)==0 || ((health newFirstEnemyMeleeCollision) <= 0)) || enemyOffScreen
+                                       newEnemyList = if ((explodeDuration firstEnemy)==0 || ((health newFirstEnemyBombCollision) <= 0)) || enemyOffScreen
                                                          then restUpdated
-                                                         else appendEnemy newFirstEnemyMeleeCollision restUpdated
+                                                         else appendEnemy newFirstEnemyBombCollision restUpdated
 updateEnemiesList [] _ = []
 
 data VideoGame = Game
