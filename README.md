@@ -6,11 +6,11 @@
 - Limited to moving on the screen
 
 ## Weapons
-- Weapon 1: Machine Gun
+- Weapon 1: Machine Gun (h)
   - shoot small bullets forward in a line, lower damage per bullet
-- Weapon 2: Shorter-range melee weapon that shoots to the side of the player
+- Weapon 2: Shorter-range melee weapon that shoots to the side of the player (k)
   - medium damage but doesn't reach far
-- Weapon 3: Placeable mine
+- Weapon 3: Placeable mine (j)
   - player places the mine, and it explodes after a few seconds, dealing high damage to enemies
 
 # Scrolling Background
