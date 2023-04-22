@@ -132,7 +132,7 @@ accelerator = Enemy {
   velocity = (3, (-1)),
   exploding = False,
   explodeDuration = 15,
-  health = 75,
+  health = 60,
   updateEnemy = acceleratorUpdater,
   enemyPic = unsafePerformIO $ loadBMP "assets/enemy2.bmp",
   size = (115, 120),
@@ -144,7 +144,7 @@ boss = Enemy {
   loc = (0, fromIntegral(round(((fromIntegral height/2) + 10)))),
   velocity = (0, -1),
   exploding = False,
-  explodeDuration = 15,
+  explodeDuration = 200,
   health = 500,
   updateEnemy = bossUpdater,
   enemyPic = unsafePerformIO $ loadBMP "assets/enemy3.bmp",
@@ -156,12 +156,23 @@ bossUpdater :: Enemy -> Enemy
 bossUpdater = moveBoss . updateEnemyPosition . updateEnemyBullets
 
 moveBoss :: Enemy -> Enemy
-moveBoss enemy = enemy {velocity = (xv', yv'), loc = (nex, ney)} -- enemyBullets = newEnemyBullets }
+moveBoss enemy = enemy {velocity = (xv', yv'), loc = (nex, ney), enemyBullets = newBullets} -- enemyBullets = newEnemyBullets }
   where
+    
     speed = 1
     (ex, ey) = loc enemy
     (ew, eh) = size enemy
     (xv, yv) = velocity enemy
+    xFreq = 27
+    yFreq = 19
+    shootingBullet = ((((round ex) + xFreq + 1) `mod` xFreq )== 0) || ((((round ey)+ yFreq + 1) `mod` yFreq) == 0)
+    enemyShootBulletOne = enemy {enemyBullets = (enemyShootBullet enemy 0 (-10) 10)}
+    enemyShootBulletTwo = enemyShootBulletOne {enemyBullets = (enemyShootBullet enemyShootBulletOne 5 (-5) 10)}
+    bulletsList = enemyBullets enemyShootBulletTwo {enemyBullets = (enemyShootBullet enemyShootBulletTwo (-5) (-5) 10)}
+    newBullets = if shootingBullet
+               then bulletsList                 
+    		   else enemyBullets enemy
+    		
     (xv', yv', nex, ney) = 
       if ((ey <= (fromIntegral height/2) - 100) && (ey >= (fromIntegral height/2) - 102)) && (ex > -(fromIntegral width/2)+(ew/2)+20)
         then (-speed, 0, ex, ey)
@@ -227,7 +238,7 @@ updateEnemyBullets enemy =
         bullet = head (enemyBullets enemy)
         rest = tail (enemyBullets enemy)
         newBullet = Bullet {
-          x = (x bullet),
+          x = (x bullet) + (xv bullet),
           y = (y bullet) + (yv bullet),
           xv = (xv bullet),
           yv = (yv bullet),
@@ -305,7 +316,7 @@ detectEnemyMeleeCollision enemy (px, py) meleeActive = enemy {health = newHealth
                        (ey + eh / 2 >= py - meleeHeight / 2) && 
                        (ey - eh / 2 <= py + meleeHeight / 2))) &&
                        meleeActive
-                  then (health enemy) - 5
+                  then (health enemy) - 2
                 else (health enemy)
                                                                                                                                     
 updateEnemiesList :: [Enemy] -> VideoGame -> [Enemy]
@@ -454,7 +465,7 @@ addBullet game = game { bullets = newBulletsList }
         y = by,
         xv = 0,
         yv = 30,
-        damage = 2
+        damage = 7
       }
     newBulletsList = 
       if (time `mod` 10 == 1) 
@@ -498,7 +509,7 @@ bulletCollidingWithEnemy bullet (enemy:rest) = isColliding
     isColliding = ((ex + ew / 2 >= bx - smallBulletDims / 2) && 
                    (ex - ew / 2 <= bx + smallBulletDims / 2) && 
                    (ey + eh / 2 >= by - smallBulletDims / 2) && 
-                   (ey - eh / 2 <= by + smallBulletDims / 2))
+                   (ey - eh / 2 <= by + smallBulletDims / 2)) || (bulletCollidingWithEnemy bullet rest) -- FIXED HERE
 
 detectHeroShot :: VideoGame -> VideoGame
 detectHeroShot game = if ((length (enemies game)) == 0)
@@ -543,7 +554,7 @@ incrementGameTimer :: VideoGame -> VideoGame
 incrementGameTimer game = game { gameTimer = (gameTimer game) + 1}
 
 spawnEnemies :: VideoGame -> VideoGame
-spawnEnemies game = game {enemies = newEnemies}
+spawnEnemies game = game {enemies = newEnemies, isBossSpawned = spawnBoss || spawnNewBoss}
   where
     randomSeed = (gameTimer game) `mod` totalEnemies
     
@@ -558,12 +569,25 @@ spawnEnemies game = game {enemies = newEnemies}
     
     
     -- possibleEnemies = [randomZigZagger,randomAccelerator]
-    possibleEnemies = [boss]
+    possibleEnemies = [randomZigZagger,randomAccelerator]
     totalEnemies = length possibleEnemies
     
-    newEnemies = if (length (enemies game) < 1)
+    spawnBoss = if (length (enemies game)) == 0
+                 then False
+                 else (isBossSpawned game)
+                 
+    spawnNewBoss = ((((gameTimer game) + 157) `mod` 100) < 10) && not (isBossSpawned game) && ((length (enemies game)) < 5)
+    
+    
+    
+    
+    
+    newEnemies = if (length (enemies game) < 5) && not (isBossSpawned game) && (not spawnNewBoss)
       then appendEnemy (possibleEnemies!!randomSeed) (enemies game)
-      else (enemies game)
+      else 
+       if spawnNewBoss
+       then [boss]
+       else enemies game
 
 updateTimer :: VideoGame -> VideoGame
 updateTimer game = game { shootTimer = newShootTimerVal }
