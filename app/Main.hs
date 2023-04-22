@@ -169,10 +169,11 @@ moveBoss enemy = enemy {velocity = (xv', yv'), loc = (nex, ney), enemyBullets = 
     enemyShootBulletOne = enemy {enemyBullets = (enemyShootBullet enemy 0 (-10) 10)}
     enemyShootBulletTwo = enemyShootBulletOne {enemyBullets = (enemyShootBullet enemyShootBulletOne 5 (-5) 10)}
     bulletsList = enemyBullets enemyShootBulletTwo {enemyBullets = (enemyShootBullet enemyShootBulletTwo (-5) (-5) 10)}
-    newBullets = if shootingBullet
-               then bulletsList                 
-    		   else enemyBullets enemy
-    		
+    newBullets =
+      if shootingBullet
+        then bulletsList
+      else enemyBullets enemy
+
     (xv', yv', nex, ney) = 
       if ((ey <= (fromIntegral height/2) - 100) && (ey >= (fromIntegral height/2) - 102)) && (ex > -(fromIntegral width/2)+(ew/2)+20)
         then (-speed, 0, ex, ey)
