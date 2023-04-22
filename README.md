@@ -2,8 +2,8 @@
 
 # Player Data
 - Health: `100`
-- Movement: `w``a``s``d`
-- Weapons: `h``j``k`
+- Movement: `w` `a` `s` `d`
+- Weapons: `h` `j` `k`
 - Limited to moving on the screen
 - Restart the game by pressing `n`
 
