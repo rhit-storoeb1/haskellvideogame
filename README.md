@@ -3,7 +3,9 @@
 # Player Data
 - Health: 100
 - Movement: wasd
+- Weapons: hjk
 - Limited to moving on the screen
+- Restart the game by pressing `n`
 
 ## Weapons
 - Weapon 1: Machine Gun (h)
